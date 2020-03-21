@@ -1,21 +1,15 @@
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.Reader;
-import java.nio.charset.Charset;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.util.InputMismatchException;
-import java.util.Scanner;
 
 /**
- * Implementation of the analogue of the {@link java.util.Scanner} class.
+ * Implementation of the fast analogue of the {@link java.util.Scanner} class.
  *
  * @author <a href="https://teleg.run/borisshapa">Boris Shaposhnikov</a>
  * @see java.util.Scanner
  */
-public class FastScanner {
+public class FastScanner implements AutoCloseable {
     final private int BUFFER_SIZE = 1 << 7;
-    private byte[] buffer;
+    private byte[] buffer = new byte[BUFFER_SIZE];
     private int bufferPointer, bytesRead;
     private InputStream in;
 
@@ -31,6 +25,23 @@ public class FastScanner {
     }
 
     /**
+     * Constructs a new Scanner that produces values scanned from the specified file.
+     *
+     * @param file A file to be scanned
+     * @throws FileNotFoundException if source is not found
+     */
+    public FastScanner(File file) throws FileNotFoundException {
+        in = new FileInputStream(file);
+    }
+
+    /**
+     * Constructs a new Scanner that produces values scanned from standard system input
+     */
+    public FastScanner() {
+        new FastScanner(System.in);
+    }
+
+    /**
      * Constructs a new Scanner that produces values scanned from the specified {@link String}.
      *
      * @param s A string to scan
@@ -42,79 +53,89 @@ public class FastScanner {
     }
 
     /**
+     * Scans the next token of the input as a char.
+     *
+     * @return the char scanned from the input
+     * @throws IOException if an error occurred while reading the file
+     */
+    private char nextChar() throws IOException {
+        char c;
+        int octet1 = read();
+        if (octet1 == -1) {
+            return Character.MIN_VALUE;
+        }
+        int cntUnits = 0;
+        for (int i = 7; i >= 0; i--) {
+            if (((1 << i) & octet1) == 0) {
+                break;
+            }
+            cntUnits++;
+        }
+        c = (char) (octet1 % (1 << (7 - cntUnits)));
+        for (int i = 0; i < cntUnits - 1; i++) {
+            int nextOctet = read();
+            c = (char) ((c << 6) + (nextOctet % (1 << 6)));
+        }
+        return c;
+    }
+
+    /**
      * Finds and returns the next complete token from this scanner.
      * A complete token is preceded and followed by input that matches the delimiter pattern.
      *
      * @return the next token
+     * @throws IOException if an error occurred while reading the file
      */
-    public String next() {
+    public String next() throws IOException {
         StringBuilder str = new StringBuilder();
-        byte c = read();
+        char c = nextChar();
         while (Character.isWhitespace(c)) {
-            c = read();
+            c = nextChar();
         }
         while (!Character.isWhitespace(c)) {
-            str.append((char) c);
-            c = read();
+            str.append(c);
+            c = nextChar();
         }
         return str.toString();
     }
+
 
     /**
      * Scans the next token of the input as an int.
      *
      * @return the int scanned from the input
+     * @throws IOException if an error occurred while reading the file
      */
-    public int nextInt() {
-        int ans = 0;
-        int sign = 1;
-        byte c = read();
+    public int nextInt() throws IOException {
+        StringBuilder strToInt = new StringBuilder();
+        char c = nextChar();
         while (Character.isWhitespace(c)) {
-            c = read();
+            c = nextChar();
         }
-        if (c == '-') {
-            sign = -1;
+        while (!Character.isWhitespace(c)) {
+            strToInt.append(c);
+            c = nextChar();
         }
-        if (c == '-' || c == '+') {
-            c = read();
-        }
-        while (!Character.isWhitespace(c) && bytesRead != -1) {
-            if (c >= '0' && c <= '9') {
-                ans = ans * 10 + (c - '0');
-                c = read();
-            } else {
-                throw new InputMismatchException();
-            }
-        }
-        return ans * sign;
+        return Integer.parseInt(strToInt.toString());
     }
 
     /**
      * Scans the next token of the input as a long.
      *
      * @return the long scanned from the input
+     * @throws IOException if an error occurred while reading the file
      */
-    public long nextLong() {
-        long ans = 0;
-        int sign = 1;
-        byte c = read();
-        while (Character.isWhitespace(c))
-            c = read();
-        if (c == '-') {
-            sign = -1;
+    public long nextLong() throws IOException {
+        StringBuilder strToLong = new StringBuilder();
+        char c = nextChar();
+        while (Character.isWhitespace(c)) {
+            c = nextChar();
         }
-        if (c == '-' || c == '+') {
-            c = read();
+        while (!Character.isWhitespace(c)) {
+            strToLong.append(c);
+            c = nextChar();
         }
-        while (!Character.isWhitespace(c) && bytesRead != -1) {
-            if (c >= '0' && c <= '9') {
-                ans = ans * 10L + (c - '0');
-                c = read();
-            } else {
-                throw new InputMismatchException();
-            }
-        }
-        return ans * sign;
+        return Long.parseLong(strToLong.toString());
     }
 
     /**
@@ -123,54 +144,30 @@ public class FastScanner {
      * If the translation is successful, the scanner advances past the input that matched.
      *
      * @return the double scanned from the input
+     * @throws IOException if an error occurred while reading the file
      */
-    public double nextDouble() {
-        double ans = 0.0;
-        int sign = 1;
-        byte c = read();
+    public double nextDouble() throws IOException {
+        StringBuilder strToDouble = new StringBuilder();
+        char c = nextChar();
         while (Character.isWhitespace(c)) {
-            c = read();
+            c = nextChar();
         }
-        if (c == '-') {
-            sign = -1;
+        while (!Character.isWhitespace(c)) {
+            strToDouble.append(c);
+            c = nextChar();
         }
-        if (c == '-' || c == '+') {
-            c = read();
-        }
-        while (!Character.isWhitespace(c) && c != '.' && bytesRead != -1) {
-            if (c >= '0' && c <= '9') {
-                ans = 10 * ans + (c - '0');
-                c = read();
-            } else {
-                throw new InputMismatchException();
-            }
-        }
-        if (c == '.') {
-            c = read();
-            double fraction = 1.0;
-            while (!Character.isWhitespace(c) && bytesRead != -1) {
-                if (c >= '0' && c <= '9') {
-                    fraction /= 10;
-                    ans += (c - '0') * fraction;
-                    c = read();
-                } else {
-                    throw new InputMismatchException();
-                }
-            }
-        }
-        return ans * sign;
+        return Double.parseDouble(strToDouble.toString());
     }
 
     /**
      * Returns true if there is another line in the input of this scanner.
      *
      * @return true if and only if this scanner has another line of input
+     * @throws IOException if an error occurred while reading the file
      */
-    public boolean hasNextLine() {
-        do {
-            read();
-            bufferPointer--;
-        } while (bytesRead == 0);
+    public boolean hasNextLine() throws IOException {
+        read();
+        bufferPointer--;
         return bytesRead != -1;
     }
 
@@ -178,9 +175,10 @@ public class FastScanner {
      * Returns true if this scanner has another token in its input.
      *
      * @return true if and only if this scanner has another token
+     * @throws IOException if an error occurred while reading the file
      */
-    public boolean hasNext() {
-        byte c = read();
+    public boolean hasNext() throws IOException {
+        int c = read();
         int pointer = 1;
         while (Character.isWhitespace(c) && bufferPointer < bytesRead) {
             c = read();
@@ -196,49 +194,41 @@ public class FastScanner {
      * The position is set to the beginning of the next line.
      *
      * @return the line that was skipped
+     * @throws IOException if an error occurred while reading the file
      */
-    public String nextLine() {
+    public String nextLine() throws IOException {
         StringBuilder str = new StringBuilder();
-        byte c;
-        String s = System.lineSeparator();
-        char p = s.charAt(0);
-        while ((c = read()) != -1) {
-            if (c == p)
+        char lineSep = System.lineSeparator().charAt(0);
+        char c = nextChar();
+        while (bytesRead != -1) {
+            if (c == lineSep)
                 break;
-            str.append((char) c);
+            str.append(c);
+            c = nextChar();
         }
         return str.toString();
     }
 
-    private void fillBuffer() {
-        try {
-            do {
-                bytesRead = in.read(buffer, bufferPointer = 0, BUFFER_SIZE);
-            } while (bytesRead != 0);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        if (bytesRead == -1)
-            buffer[0] = -1;
+    private void fillBuffer() throws IOException {
+        do {
+            bytesRead = in.read(buffer);
+        } while (bytesRead == 0);
+        bufferPointer = 0;
     }
 
-    private byte read() {
-        if (bufferPointer == bytesRead) {
+    private int read() throws IOException {
+        if (bufferPointer == bytesRead)
             fillBuffer();
-        }
-        return buffer[bufferPointer++];
+        bufferPointer++;
+        return (buffer[bufferPointer - 1] < 0) ? buffer[bufferPointer - 1] + (1 << 8) : buffer[bufferPointer - 1];
     }
 
     /**
      * Closes this scanner.
      */
-    public void close() {
+    public void close() throws IOException {
         if (in == null)
             return;
-        try {
-            in.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        in.close();
     }
 }
